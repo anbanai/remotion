@@ -14,6 +14,7 @@ import {BLUE, LIGHT_TEXT, WHITE} from '../helpers/colors';
 import {useIsEffectDeletionPending} from '../helpers/effect-deletion-state';
 import {getPreviewFileType} from '../helpers/get-preview-file-type';
 import type {SequenceNodePathInfo} from '../helpers/get-timeline-sequence-sort-key';
+import {NO_HOVER_BACKGROUND_STYLE} from '../helpers/hoverable';
 import {isStudioInteractivityEnabled} from '../helpers/interactivity-enabled';
 import {
 	flattenVisibleTreeNodes,
@@ -22,15 +23,13 @@ import {
 	type SchemaFieldGroupInfo,
 	type TimelineTreeNode,
 } from '../helpers/timeline-layout';
+import {useKeyboardShortcutLabel} from '../helpers/use-keyboard-shortcut-label';
 import {
 	useRuntimeValue,
 	useRuntimeValueSelector,
 } from '../helpers/use-runtime-values';
 import {BorderRadiusIcon} from '../icons/border-radius';
 import {CubeIcon} from '../icons/cube';
-import {FullscreenIcon} from '../icons/fullscreen';
-import {Plus} from '../icons/plus';
-import {SetSelectedModalContext} from '../state/modals';
 import {Transform3DModeStateContext} from '../state/transform-3d-mode';
 import {ActionTooltip} from './ActionTooltip';
 import {AssetFileIcon} from './AssetFileIcon';
@@ -44,6 +43,7 @@ import {
 	isSmartCollapsibleInspectorGroup,
 } from './InspectorPanel/inspector-section-collapse';
 import {LevelsEditor} from './InspectorPanel/LevelsEditor';
+import {INSPECTOR_PANEL_HORIZONTAL_PADDING} from './InspectorPanelLayout';
 import {
 	BORDER_RADIUS_SHORTHAND_KEY,
 	getBorderRadiusConversion,
@@ -79,6 +79,7 @@ import {propStatusHas3DTransformValue} from './Timeline/transform-3d-mode';
 import {Transform3DModeContext} from './Timeline/Transform3DModeContext';
 import {useTimelineExpandedTree} from './Timeline/use-timeline-expanded-tree';
 import {useSelectAsset} from './use-select-asset';
+import {useSelectEffects} from './use-select-effects';
 
 const container: React.CSSProperties = {
 	color: WHITE,
@@ -88,21 +89,30 @@ const container: React.CSSProperties = {
 	fontSize: 12,
 };
 
-const plusIcon: React.CSSProperties = {
-	width: 15,
-	height: 15,
+const sectionHeaderActionStyle: React.CSSProperties = {
+	...NO_HOVER_BACKGROUND_STYLE,
+	marginRight: -6,
 };
 
-const borderRadiusToggleIcon: React.CSSProperties = {
+const sectionHeaderActionIcon: React.CSSProperties = {
 	flexShrink: 0,
-	height: 15,
-	width: 15,
+	height: 12,
+	width: 12,
 };
 
 const transform3DToggleIcon: React.CSSProperties = {
 	flexShrink: 0,
 	height: 14,
 	width: 14,
+};
+
+const transformControlsRow: React.CSSProperties = {
+	alignItems: 'center',
+	display: 'flex',
+	gap: 25,
+	justifyContent: 'flex-start',
+	padding: `0 ${INSPECTOR_PANEL_HORIZONTAL_PADDING}px 12px`,
+	transform: 'translateX(-3px)',
 };
 
 const assetSelectorIcon: React.CSSProperties = {
@@ -332,12 +342,8 @@ export const InspectorSequenceSection: React.FC<{
 		includeSourceControls: true,
 		includeInspectorOnlyFields: true,
 	});
-	const {
-		consumeInspectorRevealRequest,
-		inspectorRevealRequest,
-		selectedItems,
-		selectItems,
-	} = useTimelineSelection();
+	const {consumeInspectorRevealRequest, inspectorRevealRequest, selectedItems} =
+		useTimelineSelection();
 	const selectedEffect =
 		selectedItems.length === 1 &&
 		(selectedItems[0].type === 'sequence-effect' ||
@@ -387,7 +393,8 @@ export const InspectorSequenceSection: React.FC<{
 		Internals.VisualModeDragOverridesContext,
 	);
 	const {setPropStatuses} = useContext(Internals.VisualModeSettersContext);
-	const {setSelectedModal} = useContext(SetSelectedModalContext);
+	const selectEffects = useSelectEffects();
+	const selectEffectsShortcut = useKeyboardShortcutLabel('selectEffects');
 	const selectAsset = useSelectAsset();
 	const selectMediaSrc = useCallback(
 		(values: Readonly<Record<string, unknown>>) =>
@@ -940,28 +947,12 @@ export const InspectorSequenceSection: React.FC<{
 		Boolean(validatedLocation.source);
 
 	const onAddEffect = useCallback(() => {
-		if (!canAddEffect || previewServerState.type !== 'connected') {
+		if (!canAddEffect) {
 			return;
 		}
 
-		setAdditionalSectionExpanded('effects', true);
-
-		setSelectedModal({
-			type: 'add-effect',
-			clientId: previewServerState.clientId,
-			fileName: validatedLocation.source,
-			nodePathInfo,
-			selectItems,
-		});
-	}, [
-		canAddEffect,
-		nodePathInfo,
-		previewServerState,
-		setAdditionalSectionExpanded,
-		setSelectedModal,
-		selectItems,
-		validatedLocation.source,
-	]);
+		selectEffects(nodePathInfo);
+	}, [canAddEffect, nodePathInfo, selectEffects]);
 
 	const onConvertBorderRadius = useCallback(() => {
 		if (
@@ -1022,13 +1013,14 @@ export const InspectorSequenceSection: React.FC<{
 				}
 				onClick={onConvertBorderRadius}
 				aria-label={borderRadiusActionLabel}
-				renderAction={(color) =>
-					borderRadiusUsesShorthand ? (
-						<FullscreenIcon color={color} style={borderRadiusToggleIcon} />
-					) : (
-						<BorderRadiusIcon color={color} style={borderRadiusToggleIcon} />
-					)
-				}
+				style={sectionHeaderActionStyle}
+				renderAction={(color) => (
+					<BorderRadiusIcon
+						color={color}
+						individual={borderRadiusUsesShorthand ?? false}
+						style={sectionHeaderActionIcon}
+					/>
+				)}
 			/>
 		</ActionTooltip>
 	) : null;
@@ -1064,7 +1056,7 @@ export const InspectorSequenceSection: React.FC<{
 			action={
 				<ActionTooltip
 					label="Add effect"
-					shortcut={null}
+					shortcut={selectEffectsShortcut}
 					delay={800}
 					dismissOnClick
 				>
@@ -1073,7 +1065,18 @@ export const InspectorSequenceSection: React.FC<{
 						disabled={!canAddEffect}
 						onClick={onAddEffect}
 						aria-label="Add effect"
-						renderAction={(color) => <Plus color={color} style={plusIcon} />}
+						style={sectionHeaderActionStyle}
+						renderAction={(color) => (
+							<svg viewBox="0 0 12 12" style={sectionHeaderActionIcon}>
+								<path
+									d="M6 1.25v9.5M1.25 6h9.5"
+									fill="none"
+									stroke={color}
+									strokeWidth="1"
+									strokeLinecap="round"
+								/>
+							</svg>
+						)}
 					/>
 				</ActionTooltip>
 			}
@@ -1112,13 +1115,7 @@ export const InspectorSequenceSection: React.FC<{
 		return (
 			<CollapsibleInspectorSectionHeader
 				action={
-					expanded
-						? group.id === 'border-radius'
-							? borderRadiusAction
-							: group.id === 'transforms'
-								? transform3DAction
-								: null
-						: null
+					expanded && group.id === 'border-radius' ? borderRadiusAction : null
 				}
 				expanded={expanded}
 				label={group.label}
@@ -1160,13 +1157,19 @@ export const InspectorSequenceSection: React.FC<{
 						{controlGroupsWithoutLayout.map((group) => (
 							<React.Fragment key={group.id}>
 								{group.id === 'transforms' ? captionsInspector : null}
-								<InspectorSection header={renderControlGroupHeader(group)}>
+								<InspectorSection
+									expanded={isControlGroupExpanded(group)}
+									header={renderControlGroupHeader(group)}
+								>
 									{isControlGroupExpanded(group) ? (
 										group.id === 'transforms' ? (
 											<Transform3DModeContext.Provider
 												value={show3DTransformControls}
 											>
-												{renderTransformControls()}
+												<div style={transformControlsRow}>
+													{renderTransformControls()}
+													{transform3DAction}
+												</div>
 												{group.rows.map(renderRow)}
 											</Transform3DModeContext.Provider>
 										) : (
@@ -1182,7 +1185,7 @@ export const InspectorSequenceSection: React.FC<{
 					? captionsInspector
 					: null}
 				{showEffectsSection ? (
-					<InspectorSection header={effectsHeader}>
+					<InspectorSection expanded={effectsExpanded} header={effectsHeader}>
 						{effectRows.length > 0 ? (
 							<TimelineSelectionOrderProvider items={effectSelectableItems}>
 								{effectRows.map((row) => {
@@ -1250,7 +1253,10 @@ export const InspectorSequenceSection: React.FC<{
 				) : null}
 				{layoutGroup ? (
 					<TimelineSelectionOrderProvider items={controlSelectableItems}>
-						<InspectorSection header={renderControlGroupHeader(layoutGroup)}>
+						<InspectorSection
+							expanded={isControlGroupExpanded(layoutGroup)}
+							header={renderControlGroupHeader(layoutGroup)}
+						>
 							{isControlGroupExpanded(layoutGroup)
 								? layoutGroup.rows.map(renderRow)
 								: null}

@@ -185,6 +185,7 @@ const RemotionRiveCanvasContentForwardRefFunction: React.ForwardRefRenderFunctio
 	const memoizedEffects = useMemoizedEffects({
 		effects,
 		overrideId: controls?.overrideId ?? null,
+		runtimeValues: controls?.runtimeValues ?? null,
 		videoConfigValues: controls?.videoConfigValues ?? null,
 	});
 
@@ -505,6 +506,7 @@ const RemotionRiveCanvasInnerForwardRefFunction: React.ForwardRefRenderFunction<
 ) => {
 	props satisfies Record<string, never>;
 
+	const videoEnabled = Internals.useVideoEnabled();
 	const memoizedEffectDefinitions = useMemoizedEffectDefinitions(effects);
 	const canvasRef = useRef<HTMLCanvasElement | null>(null);
 	const {
@@ -537,6 +539,10 @@ const RemotionRiveCanvasInnerForwardRefFunction: React.ForwardRefRenderFunction<
 		style: premountingStyle,
 		componentName: '<RemotionRiveCanvas />',
 	});
+
+	if (!videoEnabled) {
+		return null;
+	}
 
 	return (
 		<Freeze frame={freezeFrame} active={isPremountingOrPostmounting}>
